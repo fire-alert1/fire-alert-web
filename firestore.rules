@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function esAdministrador() {
+      return autenticado()
+        && exists(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        )
+        && (
+          get(
+            /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          ).data.rol == "administrador"
+          ||
+          (
+            "roles" in get(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data
+            &&
+            "administrador" in get(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data.roles
+          )
+        );
+    }
+
+    function esCuartelero() {
+      return autenticado()
+        && exists(
+          /databases/$(database)/documents/usuarios/$(request.auth.uid)
+        )
+        && (
+          get(
+            /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          ).data.rol == "cuartelero"
+          ||
+          (
+            "roles" in get(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data
+            &&
+            "cuartelero" in get(
+              /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            ).data.roles
+          )
+        );
+    }
+
+    match /usuarios/{userId} {
+
+      allow read: if autenticado()
+                  && (
+                    request.auth.uid == userId
+                    || esAdministrador()
+                  );
+
+      allow create: if esAdministrador();
+
+      allow update: if esAdministrador();
+
+      allow delete: if false;
+    }
+
+    match /alarmas/{alarmaId} {
+
+      allow read: if autenticado();
+
+      allow create: if esCuartelero()
+                    || esAdministrador();
+
+      allow update: if esCuartelero()
+                    || esAdministrador();
+
+      allow delete: if false;
+    }
+  }
+}
